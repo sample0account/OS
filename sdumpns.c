@@ -10,37 +10,6 @@
 #define PORT 9999
 #define BUFFER_SIZE 1024
 
-void handle_client(int client_socket) {
-  char buffer[BUFFER_SIZE];
-  char *response;
-  struct hostent *host;
-  struct in_addr **addr_list;
-
-  // Receive domain name from client
-  int bytes_received = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
-  if (bytes_received < 0) {
-    perror("Receive failed");
-    close(client_socket);
-    return;
-  }
-  buffer[bytes_received] = '\0'; // Null-terminate the received data
-  printf("Received domain: %s\n", buffer);
-
-  // Get the IP address of the domain
-  if ((host = gethostbyname(buffer)) == NULL) {
-    response = "Could not resolve domain";
-  } else {
-    addr_list = (struct in_addr **)host->h_addr_list;
-    response = inet_ntoa(*addr_list[0]); // Get the first IP address
-  }
-
-  // Send the IP address (or error message) to the client
-  send(client_socket, response, strlen(response), 0);
-
-  // Close the client connection
-  close(client_socket);
-}
-
 int main() {
   int server_socket, client_socket;
   struct sockaddr_in server_addr, client_addr;
@@ -73,11 +42,11 @@ int main() {
   }
 
   printf("Server listening on port %d...\n", PORT);
-
+  int bytes_received;
   // Accept and handle client connections
   while (1) {
     client_socket =
-        accept(server_socket, (struct sockaddr *)&client_addr, &addr_len);
+        accept(server_socket, (struct sockaddr *)&server_addr, &bytes_received);
     if (client_socket < 0) {
       perror("Client connection failed");
       continue;
@@ -87,7 +56,31 @@ int main() {
     // Handle the client in a new process (forking for simplicity)
     if (fork() == 0) {
       // Child process: handle the client
-      handle_client(client_socket);
+      char buffer[BUFFER_SIZE];
+      char *response;
+      struct hostent *host;
+      struct in_addr **addr_list;
+
+      // Receive domain name from client
+      bytes_received = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
+      if (bytes_received < 0) {
+        perror("Receive failed");
+        close(client_socket);
+        
+      }
+      buffer[bytes_received] = '\0'; // Null-terminate the received data
+      printf("Received domain: %s\n", buffer);
+      // Get the IP address of the domain
+      if ((host = gethostbyname(buffer)) == NULL) {
+        response = "Could not resolve domain";
+      } else {
+        addr_list = (struct in_addr **)host->h_addr_list;
+        response = inet_ntoa(*addr_list[0]); // Get the first IP address
+      }
+      // Send the IP address (or error message) to the client
+      send(client_socket, response, strlen(response), 0);
+      // Close the client connection
+      close(client_socket);
       exit(0);
     } else {
       // Parent process: continue to accept new connections
