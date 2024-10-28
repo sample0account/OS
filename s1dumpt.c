@@ -1,83 +1,46 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/socket.h>
+#include <fcntl.h> // for open
+#include <netdb.h>
 #include <netinet/in.h>
-#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h> // for close
 
 #define SERVER_PORT 8080
 #define MAX_PENDING 5
 #define MAX_LINE 256
 
-void handle_request(int client_sock) {
-    char buf[MAX_LINE];
-    int n;
-
-    // Receive the HTTP request from the client
-    while ((n = recv(client_sock, buf, sizeof(buf) - 1, 0)) > 0) {
-        buf[n] = '\0'; // Null-terminate the buffer
-        printf("Received request:\n%s\n", buf);
-
-        // Simple HTTP response
-        const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\nContent-Type: text/plain\r\n\r\nHello, World!";
-        send(client_sock, response, strlen(response), 0);
-    }
-
-    if (n < 0) {
-        perror("recv");
-    }
-
-    // Close the client socket
-    close(client_sock);
-}
-
 int main() {
-    struct sockaddr_in sin;
-    int s, new_s;
-    socklen_t client_len;
+  struct sockaddr_in sin;
+  char buf[MAX_LINE];
+  int len;
+  int s, new_s;
+  /* build address data structure */
+  bzero((char *)&sin, sizeof(sin));
+  sin.sin_family = AF_INET;
+  sin.sin_addr.s_addr = INADDR_ANY;
+  sin.sin_port = htons(SERVER_PORT);
 
-    // Initialize the sockaddr_in structure
-    memset(&sin, 0, sizeof(sin));
-    sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = INADDR_ANY;
-    sin.sin_port = htons(SERVER_PORT);
-
-    // Create a socket
-    if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("socket");
-        exit(1);
+  /* setup passive open */
+  if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
+    perror("simplex-talk: socket");
+    exit(1);
+  }
+  if ((bind(s, (struct sockaddr *)&sin, sizeof(sin))) < 0) {
+    perror("simplex-talk: bind");
+    exit(1);
+  }
+  listen(s, MAX_PENDING);
+  /* wait for connection, then receive and print text */
+  while (1) {
+    if ((new_s = accept(s, (struct sockaddr *)&sin, &len)) < 0) {
+      perror("simplex-talk: accept");
+      exit(1);
     }
-
-    // Bind the socket to the address and port
-    if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
-        perror("bind");
-        close(s);
-        exit(1);
-    }
-
-    // Listen for incoming connections
-    if (listen(s, MAX_PENDING) < 0) {
-        perror("listen");
-        close(s);
-        exit(1);
-    }
-
-    printf("Server listening on port %d...\n", SERVER_PORT);
-
-    // Main loop: accept and handle connections
-    while (1) {
-        client_len = sizeof(sin);
-        if ((new_s = accept(s, (struct sockaddr *)&sin, &client_len)) < 0) {
-            perror("accept");
-            close(s);
-            exit(1);
-        }
-
-        handle_request(new_s);
-    }
-
-    // Close the listening socket (never reached due to infinite loop)
-    close(s);
-    return 0;
+    while (len = recv(new_s, buf, sizeof(buf), 0))
+      fputs(buf, stdout);
+    close(new_s);
+  }
 }
