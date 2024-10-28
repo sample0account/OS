@@ -1,18 +1,17 @@
-#include <stdio.h>
-#include<string.h>
-#include<stdlib.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
 #include <fcntl.h> // for open
+#include <netdb.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h> // for close
 
 #define SERVER_PORT 8080
 #define MAX_LINE 256
 
-int main(int argc, char * argv[])
-{
+int main(int argc, char *argv[]) {
   FILE *fp;
   struct hostent *hp;
   struct sockaddr_in sin;
@@ -20,14 +19,13 @@ int main(int argc, char * argv[])
   char buf[MAX_LINE];
   int s;
   int len;
-  if (argc==2) {
+  if (argc == 2) {
     host = argv[1];
-  }
-  else {
+  } else {
     fprintf(stderr, "usage: simplex-talk host\n");
-  exit(1);
+    exit(1);
   }
-/* translate host name into peer’s IP address */
+  /* translate host name into peer’s IP address */
   hp = gethostbyname(host);
   if (!hp) {
     fprintf(stderr, "simplex-talk: unknown host: %s\n", host);
@@ -50,7 +48,7 @@ int main(int argc, char * argv[])
   }
   /* main loop: get and send lines of text */
   while (fgets(buf, sizeof(buf), stdin)) {
-    buf[MAX_LINE-1] = '\0';
+    buf[MAX_LINE - 1] = '\0';
     len = strlen(buf) + 1;
     send(s, buf, len, 0);
   }
